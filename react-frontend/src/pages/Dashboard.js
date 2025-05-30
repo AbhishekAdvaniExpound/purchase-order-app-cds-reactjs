@@ -23,9 +23,10 @@ import {
   IconButton,
   Select,
 } from "@chakra-ui/react";
-import { CheckCircle, Truck, Clock, Repeat } from "lucide-react";
+import { CheckCircle, Truck, Clock, Repeat, Download } from "lucide-react";
 import { fetchOrders, approvePO, orderPO } from "../api";
 import KPICards from "./KPICards";
+import axios from "axios";
 
 const statusMap = {
   PENDING: { label: "Pending", color: "yellow.600", icon: Clock },
@@ -67,6 +68,28 @@ export default function Dashboard() {
     statusFilter === "ALL"
       ? orders
       : orders.filter((po) => po.status === statusFilter);
+
+  const handleDownloadPDF = async (id) => {
+    try {
+      const response = await axios.post(
+        "http://localhost:4004/rest/purchase-order/generatePDF",
+        { ID: id },
+        { responseType: "blob" } // 💡 Important to get binary data
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `PO-${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+    }
+  };
 
   return (
     <Box p={0} bg="gray.50" minH="100vh">
@@ -119,9 +142,9 @@ export default function Dashboard() {
                 <Table variant="simple" size="md">
                   <Thead bg="gray.100">
                     <Tr>
-                      <Th>PO Title</Th>
-                      <Th>
-                        <HStack>
+                      <Th textAlign="center">PO Title</Th>
+                      <Th textAlign="center">
+                        <HStack justify="center">
                           <Text>Status</Text>
                           <Select
                             size="xs"
@@ -137,6 +160,7 @@ export default function Dashboard() {
                         </HStack>
                       </Th>
                       <Th textAlign="center">Actions</Th>
+                      <Th textAlign="center">Download PO</Th>
                     </Tr>
                   </Thead>
                   <Tbody>
@@ -145,11 +169,14 @@ export default function Dashboard() {
                         const status = statusMap[po.status];
                         return (
                           <Tr key={po.ID} _hover={{ bg: "gray.50" }}>
-                            <Td fontWeight="medium">{po.title}</Td>
+                            <Td fontWeight="medium" textAlign="center">
+                              {po.title}
+                            </Td>
                             <Td>
                               <HStack
                                 color={status.color}
                                 fontWeight="semibold"
+                                justify="center"
                               >
                                 <Icon as={status.icon} boxSize={4} />
                                 <Text>{status.label}</Text>
@@ -181,6 +208,17 @@ export default function Dashboard() {
                                   </Text>
                                 )}
                               </HStack>
+                            </Td>
+                            <Td textAlign="center">
+                              <Button
+                                size="sm"
+                                colorScheme="gray"
+                                variant="outline"
+                                justifyItems="center"
+                                onClick={() => handleDownloadPDF(po.ID)}
+                              >
+                                <Icon as={Download} boxSize={4} />
+                              </Button>
                             </Td>
                           </Tr>
                         );

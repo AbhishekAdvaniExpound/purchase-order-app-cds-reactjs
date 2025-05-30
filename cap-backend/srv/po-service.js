@@ -1,5 +1,8 @@
 /* eslint-disable no-console */
 const cds = require("@sap/cds");
+const PDFDocument = require("pdfkit");
+const nodemailer = require("nodemailer");
+const { Readable } = require("stream");
 
 module.exports = cds.service.impl(async function () {
   const { PurchaseOrder } = this.entities;
@@ -70,5 +73,82 @@ module.exports = cds.service.impl(async function () {
       orderedOrders: orderedOrders[0].count,
       totalAmount,
     };
+  });
+
+  this.on("generatePDF", async (req) => {
+    const { ID } = req.data;
+
+    const tx = cds.transaction(req);
+    const [po] = await tx.run(SELECT.from(PurchaseOrder).where({ ID }));
+
+    if (!po) return req.error(404, "Purchase Order not found");
+
+    const PDFDocument = require("pdfkit");
+    const doc = new PDFDocument();
+
+    // Set headers
+    req._.res.setHeader("Content-Type", "application/pdf");
+    req._.res.setHeader("Content-Disposition", `inline; filename=PO-${ID}.pdf`);
+
+    doc.pipe(req._.res); // pipe PDF directly to response
+
+    // Sample PDF content
+    doc.fontSize(18).text("Purchase Order", { align: "center" });
+    doc.moveDown();
+    doc.fontSize(12).text(`PO ID: ${po.ID}`);
+    doc.text(`Title: ${po.title}`);
+    doc.text(`Status: ${po.status}`);
+    doc.text(`Total Amount: ₹${po.totalAmount}`);
+
+    doc.end();
+
+    return; // ❌ No return needed since we're streaming
+  });
+
+  this.on("emailPDF", async (req) => {
+    const { ID, email } = req.data;
+    const tx = cds.transaction(req);
+    const [po] = await tx.run(SELECT.from(PurchaseOrder).where({ ID }));
+
+    if (!po) return req.error(404, "Purchase Order not found");
+
+    // Generate PDF in memory
+    const doc = new PDFDocument();
+    const chunks = [];
+    doc.on("data", (chunk) => chunks.push(chunk));
+    doc.on("end", async () => {
+      const pdfBuffer = Buffer.concat(chunks);
+
+      // Send email
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "your-email@gmail.com",
+          pass: "your-app-password", // Use App Password or OAuth2
+        },
+      });
+
+      await transporter.sendMail({
+        from: '"PO System" <your-email@gmail.com>',
+        to: email,
+        subject: `PO #${po.ID}`,
+        text: "Attached is your PO PDF",
+        attachments: [
+          {
+            filename: `PO-${po.ID}.pdf`,
+            content: pdfBuffer,
+          },
+        ],
+      });
+    });
+
+    doc.text("Purchase Order").moveDown();
+    doc.text(`PO ID: ${po.ID}`);
+    doc.text(`Title: ${po.title}`);
+    doc.text(`Status: ${po.status}`);
+    doc.text(`Amount: ₹${po.totalAmount}`);
+    doc.end();
+
+    return "Email sent.";
   });
 });
