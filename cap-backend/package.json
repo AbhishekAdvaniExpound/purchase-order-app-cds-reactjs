@@ -1,0 +1,25 @@
+{
+  "name": "cap-po-backend",
+  "version": "1.0.0",
+  "description": "CAPM backend for Purchase Order app",
+  "scripts": {
+    "start": "cds run"
+  },
+  "dependencies": {
+    "@sap/cds": "^7.5.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.7"
+  },
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "sql"
+      }
+    },
+    "odata": {
+      "version": "v4"
+    },
+    "rest": true
+  }
+}
